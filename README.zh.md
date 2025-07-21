@@ -4,27 +4,27 @@
 
 一个 PostgreSQL 安全扩展，创建蜜罐表来检测未授权的数据库访问。当有人读取这些表时，会触发通知发送到指定的 API 端点。这是一个用于数据库管理员的防御性网络安全工具。
 
-## 🚀 快速开始（推荐使用 Docker）
+## 🚀 快速开始（一键部署）
 
-### 1. 一键启动
+### 1. 克隆并启动
 ```bash
 git clone <repository>
 cd pg_honeypot
-docker-compose -f docker-compose-simple.yml up -d
+./start.sh
 ```
 
-### 2. 测试蜜罐
+### 2. 访问控制台
+- **Web 控制台**: http://localhost:8080
+- **数据库**: localhost:5432 (用户: postgres, 密码: honeypot123)
+
+### 3. 测试蜜罐
 ```bash
-# 连接数据库（密码：honeypot123）
-psql -h localhost -U postgres -d postgres
-
-# 查询蜜罐表触发警报
-SELECT * FROM honeypot_customer_view LIMIT 1;
+# 触发蜜罐警报
+docker-compose exec postgres psql -U postgres -d postgres -c "SELECT * FROM honeypot_customer_view LIMIT 1;"
 ```
 
-### 3. 查看警报
-- **Web 控制台**: http://localhost:8090
-- **API 接口**: http://localhost:8080
+### 4. 查看实时警报
+访问 http://localhost:8080 控制台，立即查看警报！
 
 ## 📋 功能特性
 
@@ -34,20 +34,33 @@ SELECT * FROM honeypot_customer_view LIMIT 1;
 - 🐳 **容器化部署**: 一键启动，包含所有依赖
 - 🔧 **开发友好**: 完整的构建系统和开发工具
 
-## 🏗️ 系统架构
+## 🏗️ 简化架构（2个容器）
 
-该系统包含以下组件：
+系统现在只包含 **2个容器**，大大简化了部署：
 
 ### 核心服务
-1. **PostgreSQL 数据库**: 主数据库，包含蜜罐功能（端口 5432）
-2. **Python 警报监听器**: HTTP 服务器，接收蜜罐警报（端口 8080）
-3. **警报转发器**: 从数据库读取警报并转发到 HTTP API
-4. **Web 控制台**: 查看警报的简单界面（端口 8090）
+1. **PostgreSQL 容器** (`honeypot_postgres`)
+   - 主数据库与蜜罐表（端口 5432）
+   - 自动创建蜜罐表
+   - 警报记录到数据库
+
+2. **监控容器** (`honeypot_monitor`)
+   - HTTP API 服务器（端口 8080）
+   - Web 控制台界面
+   - 数据库警报监控
+   - 外部 webhook 转发
 
 ### 数据流
 ```
-蜜罐表访问 → PostgreSQL 日志 → 数据库警报表 → 转发器 → HTTP API → Web 控制台
+蜜罐表访问 → PostgreSQL 警报表 → 监控服务 → Web 控制台 + 外部 Webhook
 ```
+
+### 新架构优势
+- ✅ **简化部署**: 仅2个容器，而非4个
+- ✅ **降低复杂性**: 所有监控逻辑集成在一个服务中
+- ✅ **更好性能**: 直接数据库监控
+- ✅ **易于维护**: 减少组件数量
+- ✅ **单一访问点**: 所有功能集中在一个端口（8080）
 
 ## 📦 部署方式
 

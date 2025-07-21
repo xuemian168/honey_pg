@@ -4,27 +4,27 @@
 
 A PostgreSQL security extension that creates honeypot tables to detect unauthorized database access. When someone reads from these tables, notifications are sent to a specified API endpoint. This is a defensive cybersecurity tool for database administrators.
 
-## 🚀 Quick Start (Docker Recommended)
+## 🚀 Quick Start (One-Click Deploy)
 
-### 1. One-Click Deploy
+### 1. Clone and Start
 ```bash
 git clone <repository>
 cd pg_honeypot
-docker-compose -f docker-compose-simple.yml up -d
+./start.sh
 ```
 
-### 2. Test the Honeypot
+### 2. Access Dashboard
+- **Web Dashboard**: http://localhost:8080
+- **Database**: localhost:5432 (user: postgres, password: honeypot123)
+
+### 3. Test the Honeypot
 ```bash
-# Connect to database (password: honeypot123)
-psql -h localhost -U postgres -d postgres
-
-# Query honeypot table to trigger alert
-SELECT * FROM honeypot_customer_view LIMIT 1;
+# Trigger honeypot alert
+docker-compose exec postgres psql -U postgres -d postgres -c "SELECT * FROM honeypot_customer_view LIMIT 1;"
 ```
 
-### 3. View Alerts
-- **Web Dashboard**: http://localhost:8090
-- **API Endpoint**: http://localhost:8080
+### 4. View Real-time Alerts
+Check the dashboard at http://localhost:8080 to see the alert appear instantly!
 
 ## 📋 Features
 
@@ -34,43 +34,56 @@ SELECT * FROM honeypot_customer_view LIMIT 1;
 - 🐳 **Containerized**: One-click deployment with all dependencies
 - 🔧 **Developer Friendly**: Complete build system and development tools
 
-## 🏗️ Architecture
+## 🏗️ Simplified Architecture (2 Containers)
 
-The system consists of the following components:
+The system now consists of just **2 containers** for simplified deployment:
 
 ### Core Services
-1. **PostgreSQL Database**: Main database with honeypot functionality (port 5432)
-2. **Python Alert Listener**: HTTP server that receives honeypot alerts (port 8080)
-3. **Alert Forwarder**: Reads alerts from database and forwards to HTTP API
-4. **Web Dashboard**: Simple interface to view alerts (port 8090)
+1. **PostgreSQL Container** (`honeypot_postgres`)
+   - Main database with honeypot tables (port 5432)
+   - Automatic honeypot table creation
+   - Alert logging to database
+
+2. **Monitor Container** (`honeypot_monitor`)
+   - HTTP API server (port 8080)
+   - Web dashboard interface
+   - Database alert monitoring
+   - External webhook forwarding
 
 ### Data Flow
 ```
-Honeypot Access → PostgreSQL Log → Database Alert Table → Forwarder → HTTP API → Web Dashboard
+Honeypot Access → PostgreSQL Alert Table → Monitor Service → Web Dashboard + External Webhook
 ```
+
+### Benefits of New Architecture
+- ✅ **Simplified deployment**: Only 2 containers instead of 4
+- ✅ **Reduced complexity**: All monitoring logic in one service
+- ✅ **Better performance**: Direct database monitoring
+- ✅ **Easier maintenance**: Fewer moving parts
+- ✅ **Single access point**: All features on one port (8080)
 
 ## 📦 Installation Options
 
-### Option 1: Docker Compose (Recommended)
+### Option 1: One-Click Start (Recommended)
 
-**Start Services**
+**Use the provided start script for easiest deployment:**
 ```bash
-docker-compose -f docker-compose-simple.yml up -d
+./start.sh
 ```
 
-**Check Status**
+**Manual Docker Compose commands:**
 ```bash
-docker-compose -f docker-compose-simple.yml ps
-```
+# Start services
+docker-compose up -d --build
 
-**View Logs**
-```bash
-docker-compose -f docker-compose-simple.yml logs -f
-```
+# Check status
+docker-compose ps
 
-**Stop Services**
-```bash
-docker-compose -f docker-compose-simple.yml down
+# View logs
+docker-compose logs -f monitor
+
+# Stop services
+docker-compose down
 ```
 
 ### Option 2: Manual Installation
@@ -95,16 +108,10 @@ sudo make install
 CREATE EXTENSION pg_honeypot;
 ```
 
-**4. Start Python Services**
+**4. Start Monitor Service**
 ```bash
-# Start alert listener
-python3 honeypot_listener.py &
-
-# Start forwarder
-python3 honeypot_forwarder.py &
-
-# Start web dashboard
-cd dashboard && python3 dashboard.py &
+# Start the unified monitor service
+python3 honeypot_monitor.py
 ```
 
 ## 🎯 Usage Guide
@@ -169,13 +176,16 @@ GRANT SELECT ON honeypot_secrets_view TO honeypot_test;
 **Monitoring and Alerting**
 ```bash
 # View real-time PostgreSQL alerts
-docker-compose -f docker-compose-simple.yml logs -f postgres | grep "HONEYPOT ALERT"
+docker-compose logs -f postgres | grep "HONEYPOT ALERT"
 
-# View HTTP listener logs
-docker-compose -f docker-compose-simple.yml logs -f honeypot_listener
+# View monitor service logs
+docker-compose logs -f monitor
 
-# View alert forwarder logs
-docker-compose -f docker-compose-simple.yml logs -f honeypot_forwarder
+# Check service health
+curl http://localhost:8080/health
+
+# Get alerts via API
+curl http://localhost:8080/api/alerts
 ```
 
 ## 🔧 Development and Debugging
