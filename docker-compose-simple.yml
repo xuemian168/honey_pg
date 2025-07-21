@@ -1,0 +1,79 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: pg_honeypot_simple
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=honeypot123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-simple.sql:/docker-entrypoint-initdb.d/init-simple.sql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  honeypot_listener:
+    image: python:3.11-alpine
+    container_name: honeypot_listener
+    depends_on:
+      - postgres
+    ports:
+      - "8080:8080"
+    volumes:
+      - .:/app
+      - ./logs:/app/logs
+    working_dir: /app
+    command: >
+      sh -c "
+        pip install -r requirements.txt;
+        python honeypot_listener.py
+      "
+    environment:
+      - HONEYPOT_HOST=0.0.0.0
+      - HONEYPOT_PORT=8080
+    restart: unless-stopped
+
+  honeypot_forwarder:
+    image: python:3.11-alpine
+    container_name: honeypot_forwarder
+    depends_on:
+      - postgres
+      - honeypot_listener
+    volumes:
+      - .:/app
+      - ./logs:/app/logs
+    working_dir: /app
+    command: >
+      sh -c "
+        pip install -r requirements.txt;
+        python honeypot_forwarder.py
+      "
+    environment:
+      - DATABASE_URL=postgresql://postgres:honeypot123@postgres:5432/postgres
+      - HONEYPOT_API_URL=http://honeypot_listener:8080/alert
+    restart: unless-stopped
+
+  dashboard:
+    image: python:3.11-alpine
+    container_name: honeypot_dashboard
+    depends_on:
+      - honeypot_listener
+    ports:
+      - "8090:8090"
+    volumes:
+      - ./dashboard:/app
+      - ./logs:/app/logs:ro
+    working_dir: /app
+    command: ["python", "dashboard.py"]
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local

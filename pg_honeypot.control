@@ -1,0 +1,4 @@
+comment = 'PostgreSQL Honeypot Extension - Creates honeypot tables for intrusion detection'
+default_version = '1.0'
+module_pathname = '$libdir/pg_honeypot'
+relocatable = true

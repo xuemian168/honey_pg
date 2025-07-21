@@ -1,0 +1,40 @@
+# Build artifacts
+*.o
+*.so
+*.dylib
+*.dll
+
+# PostgreSQL extension build files
+regression.diffs
+regression.out
+tmp_check/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+
+# Logs
+*.log
+honeypot_alerts.json
+logs/
+
+# Docker
+.docker/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak
