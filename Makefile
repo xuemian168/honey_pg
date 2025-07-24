@@ -7,6 +7,10 @@ MODULES = pg_honeypot
 # PostgreSQL build system
 PG_CONFIG = pg_config
 PGXS := $(shell $(PG_CONFIG) --pgxs)
+
+# Disable LLVM bitcode generation on Alpine
+override with_llvm = no
+
 include $(PGXS)
 
 # Additional targets for development
@@ -53,7 +57,9 @@ dev-setup: install-dev
 	@echo "1. Ensure PostgreSQL is running"
 	@echo "2. Connect to your database and run: CREATE EXTENSION pg_honeypot;"
 	@echo "3. Start the listener: python3 honeypot_listener.py"
-	@echo "4. Create honeypot tables: SELECT pg_honeypot_create_table('sensitive_data');"
+	@echo "4. Create honeypot tables:"
+	@echo "   - Regular: SELECT pg_honeypot_create_table('sensitive_data');"
+	@echo "   - Infinite: SELECT pg_honeypot_create_infinite_table('secret_vault', 5, 'mixed');"
 
 # Help target
 help:

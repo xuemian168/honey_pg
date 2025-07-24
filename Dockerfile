@@ -14,6 +14,7 @@ WORKDIR /build
 
 # Copy extension source files
 COPY pg_honeypot.c .
+COPY pg_honeypot_patterns.h .
 COPY pg_honeypot.control .
 COPY pg_honeypot--1.0.sql .
 COPY Makefile .
@@ -28,6 +29,8 @@ FROM postgres:15-alpine
 RUN apk add --no-cache \
     python3 \
     py3-pip \
+    py3-psycopg2 \
+    py3-requests \
     curl \
     bash
 
@@ -38,18 +41,16 @@ COPY --from=builder /usr/local/share/postgresql/extension/ /usr/local/share/post
 # Set working directory
 WORKDIR /app
 
-# Copy Python requirements and listener
-COPY requirements.txt .
+# Copy Python scripts
 COPY honeypot_listener.py .
+COPY honeypot_monitor.py .
 
-# Install Python dependencies
-RUN pip3 install --no-cache-dir -r requirements.txt
-
-# Make listener executable
-RUN chmod +x honeypot_listener.py
+# Make scripts executable
+RUN chmod +x honeypot_listener.py honeypot_monitor.py
 
 # Copy initialization scripts
-COPY docker/init-honeypot.sql /docker-entrypoint-initdb.d/
+COPY docker/init-honeypot.sql /docker-entrypoint-initdb.d/01-init-honeypot.sql
+COPY docker/init-infinite-honeypot.sql /docker-entrypoint-initdb.d/02-init-infinite.sql
 
 # Create directory for logs
 RUN mkdir -p /app/logs

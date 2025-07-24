@@ -188,6 +188,53 @@ curl http://localhost:8080/health
 curl http://localhost:8080/api/alerts
 ```
 
+### Infinite Data Generation (New Feature)
+
+The extension now supports creating honeypot tables that generate infinite fake data on-the-fly, using minimal disk storage.
+
+**Create Infinite Honeypot Table**
+```sql
+-- Create table with infinite virtual data
+SELECT pg_honeypot_create_infinite_table('secret_vault', 5, 'mixed');
+
+-- Pattern types: 'mixed', 'ssn', 'credit_card', 'api_key', 'password', 'email', 'phone'
+SELECT pg_honeypot_create_infinite_table('credit_cards', 10, 'credit_card');
+```
+
+**Configure Infinite Data Behavior**
+```sql
+-- Set limits and delays
+SELECT pg_honeypot_set_infinite_config(
+    1000,    -- max_rows_per_query (NULL = unlimited)
+    10,      -- delay_ms_per_row (0-1000ms)
+    true     -- randomize data
+);
+
+-- Via configuration variables
+SET pg_honeypot.max_rows_per_query = 5000;
+SET pg_honeypot.delay_ms_per_row = 50;
+SET pg_honeypot.randomize = false;
+```
+
+**How It Works**
+- Only stores 5-10 seed rows on disk (< 1KB per table)
+- Generates infinite data streams when queried
+- `SELECT * FROM secret_vault` returns endless rows
+- `SELECT COUNT(*)` never completes (traps attackers)
+- Each row is generated on-demand in memory
+
+**Attack Scenarios**
+```sql
+-- Attacker tries to dump all data (gets trapped)
+SELECT * FROM secret_vault;  -- Infinite rows!
+
+-- Attacker tries to count records (never finishes)
+SELECT COUNT(*) FROM secret_vault;  -- Runs forever
+
+-- Attacker tries to export (streams infinitely)
+COPY secret_vault TO '/tmp/stolen.csv';  -- Endless export
+```
+
 ## 🔧 Development and Debugging
 
 ### Development Environment

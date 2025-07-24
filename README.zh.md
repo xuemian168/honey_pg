@@ -191,6 +191,53 @@ docker-compose -f docker-compose-simple.yml logs -f honeypot_listener
 docker-compose -f docker-compose-simple.yml logs -f honeypot_forwarder
 ```
 
+### 无限数据生成（新功能）
+
+该扩展现在支持创建生成无限假数据的蜜罐表，使用极少的磁盘存储空间。
+
+**创建无限蜜罐表**
+```sql
+-- 创建带有无限虚拟数据的表
+SELECT pg_honeypot_create_infinite_table('secret_vault', 5, 'mixed');
+
+-- 数据模式类型：'mixed', 'ssn', 'credit_card', 'api_key', 'password', 'email', 'phone'
+SELECT pg_honeypot_create_infinite_table('credit_cards', 10, 'credit_card');
+```
+
+**配置无限数据行为**
+```sql
+-- 设置限制和延迟
+SELECT pg_honeypot_set_infinite_config(
+    1000,    -- max_rows_per_query（NULL = 无限制）
+    10,      -- delay_ms_per_row（0-1000毫秒）
+    true     -- 随机化数据
+);
+
+-- 通过配置变量设置
+SET pg_honeypot.max_rows_per_query = 5000;
+SET pg_honeypot.delay_ms_per_row = 50;
+SET pg_honeypot.randomize = false;
+```
+
+**工作原理**
+- 磁盘上仅存储 5-10 条种子记录（每个表 < 1KB）
+- 查询时生成无限数据流
+- `SELECT * FROM secret_vault` 返回无尽的行
+- `SELECT COUNT(*)` 永不完成（陷阱攻击者）
+- 每行数据在内存中按需生成
+
+**攻击场景**
+```sql
+-- 攻击者尝试转储所有数据（被困住）
+SELECT * FROM secret_vault;  -- 无限行！
+
+-- 攻击者尝试计数记录（永不结束）
+SELECT COUNT(*) FROM secret_vault;  -- 永远运行
+
+-- 攻击者尝试导出（无限流）
+COPY secret_vault TO '/tmp/stolen.csv';  -- 无尽导出
+```
+
 ## 🔧 开发和调试
 
 ### 开发环境设置
