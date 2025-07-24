@@ -11,7 +11,7 @@ services:
       - POSTGRES_PASSWORD=honeypot123
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init-simple.sql:/docker-entrypoint-initdb.d/init-simple.sql
+      - ./docker/init-infinite-honeypot.sql:/docker-entrypoint-initdb.d/init-infinite-honeypot.sql
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d postgres || exit 1"]

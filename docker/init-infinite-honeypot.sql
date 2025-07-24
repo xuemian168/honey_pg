@@ -62,7 +62,7 @@ AS $$
         END as sensitive_data,
         now() - ((random() * 365)::int || ' days')::interval + 
                 (series.n || ' seconds')::interval as created_at
-    FROM generate_series(start_at, 9223372036854775807) as series(n);
+    FROM generate_series(start_at, LEAST(start_at + 10000, 9223372036854775807)) as series(n);
 $$;
 
 -- Create alert logging table
@@ -94,6 +94,50 @@ BEGIN
         TG_TABLE_NAME, current_user, COALESCE(inet_client_addr()::text, 'local');
     
     RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create simple access logging function for views (optimized)
+CREATE OR REPLACE FUNCTION honeypot.log_access_simple(table_name text)
+RETURNS TEXT AS $$
+DECLARE
+    session_key text;
+    last_log_time timestamptz;
+BEGIN
+    -- Create a session-specific key to avoid duplicate logging
+    session_key := table_name || '_' || pg_backend_pid()::text;
+    
+    -- Check if we've already logged for this session recently (within 1 second)
+    SELECT created_at INTO last_log_time 
+    FROM honeypot.alerts 
+    WHERE table_name = log_access_simple.table_name 
+      AND user_name = current_user
+      AND created_at > NOW() - INTERVAL '1 second'
+    ORDER BY created_at DESC 
+    LIMIT 1;
+    
+    -- Only log if we haven't logged recently for this table/user
+    IF last_log_time IS NULL THEN
+        -- Log the access
+        INSERT INTO honeypot.alerts (table_name, user_name, client_ip, query_type, rows_accessed)
+        VALUES (
+            table_name,
+            current_user,
+            inet_client_addr()::text,
+            'SELECT',
+            1
+        );
+        
+        -- Also log to PostgreSQL log (only once per session)
+        RAISE WARNING 'HONEYPOT ACCESS: Table % accessed by user % from %', 
+            table_name, current_user, COALESCE(inet_client_addr()::text, 'local');
+    END IF;
+    
+    RETURN 'alert_logged';
+EXCEPTION
+    WHEN OTHERS THEN
+        -- If logging fails, still return something
+        RETURN 'alert_error';
 END;
 $$ LANGUAGE plpgsql;
 
@@ -131,10 +175,11 @@ max_id AS (
 SELECT 
     id,
     SPLIT_PART(sensitive_data, ' | ', 1) as account_info,
-    SPLIT_PART(SPLIT_PART(sensitive_data, ' | ', 2), ': $', 2)::decimal as balance,
+    -- Remove commas before converting to decimal
+    REPLACE(SPLIT_PART(SPLIT_PART(sensitive_data, ' | ', 2), ': $', 2), ',', '')::decimal as balance,
     SPLIT_PART(SPLIT_PART(sensitive_data, ' | ', 3), ': ', 2) as routing_number,
     created_at,
-    'alert_logged' as _alert
+    honeypot.log_access_simple('honeypot_financial_view') as _alert
 FROM (
     SELECT * FROM seed_data
     UNION ALL
@@ -142,11 +187,10 @@ FROM (
     FROM honeypot.generate_infinite_data('account', (SELECT max_id + 1 FROM max_id))
 ) combined_data;
 
--- Create access trigger
-CREATE TRIGGER honeypot_financial_trigger
-    AFTER SELECT ON honeypot.financial_seed
-    FOR EACH STATEMENT
-    EXECUTE FUNCTION honeypot.log_access();
+-- Note: PostgreSQL doesn't support AFTER SELECT triggers
+-- Access logging is handled by the view rules instead
+
+-- Access logging will be handled in the view definition itself
 
 -- 2. Customer Records (Infinite)
 CREATE TABLE honeypot.customer_seed (
@@ -158,9 +202,9 @@ CREATE TABLE honeypot.customer_seed (
 );
 
 INSERT INTO honeypot.customer_seed (customer_id, ssn, credit_card) VALUES
-('CUST-0024', '###-##-7094', '4532-9145-3674-5005'),
-('CUST-4369', '###-##-9529', '4532-6210-4807-6847'),
-('CUST-6636', '###-##-3050', '4532-4771-3553-0747');
+('CUST-001', '***-**-1234', '4532-1234-5678-9012'),
+('CUST-002', '***-**-5678', '4532-2345-6789-0123'),
+('CUST-003', '***-**-9012', '4532-3456-7890-1234');
 
 CREATE OR REPLACE VIEW honeypot_customer_view AS
 WITH seed_data AS (
@@ -179,8 +223,8 @@ generated AS (
     SELECT 
         id,
         'CUST-' || LPAD(((id * 13) % 999999)::text, 6, '0') as customer_id,
-        SPLIT_PART(sensitive_data, ' | ', 1) as ssn_info,
-        'Credit Card: 4532-' || 
+        REPLACE(SPLIT_PART(sensitive_data, ' | ', 1), 'SSN: ', '') as ssn,
+        '4532-' || 
         LPAD(((id * 1234) % 10000)::text, 4, '0') || '-' ||
         LPAD(((id * 5678) % 10000)::text, 4, '0') || '-' ||
         LPAD(((id * 9012) % 10000)::text, 4, '0') as credit_card,
@@ -190,20 +234,20 @@ generated AS (
 SELECT 
     id,
     customer_id,
-    COALESCE(ssn, REPLACE(ssn_info, 'SSN: ', '')) as ssn,
-    COALESCE(credit_card, 'N/A') as credit_card,
+    ssn,
+    credit_card,
     created_at,
-    'alert_logged' as _alert
+    honeypot.log_access_simple('honeypot_customer_view') as _alert
 FROM (
     SELECT * FROM seed_data
     UNION ALL
-    SELECT id, customer_id, ssn_info as ssn, credit_card, created_at FROM generated
+    SELECT * FROM generated
 ) combined_data;
 
-CREATE TRIGGER honeypot_customer_trigger
-    AFTER SELECT ON honeypot.customer_seed
-    FOR EACH STATEMENT
-    EXECUTE FUNCTION honeypot.log_access();
+-- Note: PostgreSQL doesn't support AFTER SELECT triggers
+-- Access logging is handled by the view rules instead
+
+-- Access logging will be handled in the view definition itself
 
 -- 3. Employee Records (Infinite)
 CREATE TABLE honeypot.employee_seed (
@@ -231,7 +275,14 @@ WITH seed_data AS (
 max_id AS (
     SELECT COALESCE(MAX(id), 0) as max_id FROM seed_data
 )
-SELECT * FROM (
+SELECT 
+    id,
+    employee_id,
+    department,
+    sensitive_info,
+    created_at,
+    honeypot.log_access_simple('honeypot_employee_view') as _alert
+FROM (
     SELECT * FROM seed_data
     UNION ALL
     SELECT 
@@ -243,10 +294,10 @@ SELECT * FROM (
     FROM honeypot.generate_infinite_data('employee', (SELECT max_id + 1 FROM max_id))
 ) combined_data;
 
-CREATE TRIGGER honeypot_employee_trigger
-    AFTER SELECT ON honeypot.employee_seed
-    FOR EACH STATEMENT
-    EXECUTE FUNCTION honeypot.log_access();
+-- Note: PostgreSQL doesn't support AFTER SELECT triggers
+-- Access logging is handled by the view rules instead
+
+-- Access logging will be handled in the view definition itself
 
 -- Create convenience functions
 CREATE OR REPLACE FUNCTION honeypot_query(
