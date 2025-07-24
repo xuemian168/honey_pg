@@ -104,53 +104,505 @@ class HoneypotMonitorHandler(BaseHTTPRequestHandler):
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>PostgreSQL Honeypot Monitor</title>
+    <title>🍯 Honeypot Command Center</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
-        .container { max-width: 1200px; margin: 0 auto; }
-        .header { background: #fff; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .stats { display: flex; gap: 20px; margin-bottom: 20px; }
-        .stat-card { background: #fff; padding: 20px; border-radius: 8px; flex: 1; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; }
-        .stat-number { font-size: 2em; font-weight: bold; color: #f44336; }
-        .stat-label { color: #666; margin-top: 5px; }
-        .alerts-container { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        .alert { background: #ffebee; border: 1px solid #f44336; padding: 15px; margin: 10px 0; border-radius: 4px; }
-        .timestamp { color: #666; font-size: 0.9em; margin-top: 10px; }
-        .no-alerts { text-align: center; color: #666; padding: 40px; }
-        .refresh-btn { background: #2196F3; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
-        .refresh-btn:hover { background: #1976D2; }
-        .status-indicator { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
-        .status-online { background-color: #4CAF50; }
-        .status-offline { background-color: #f44336; }
+        :root {
+            --primary-glow: #00f5ff;
+            --secondary-glow: #ff6b6b;
+            --accent-glow: #4ecdc4;
+            --warning-glow: #ffd700;
+            --bg-dark: #0a0a0a;
+            --bg-darker: #050505;
+            --bg-card: rgba(15, 15, 25, 0.9);
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0a0;
+            --border-glow: rgba(0, 245, 255, 0.3);
+        }
         
-        /* New styles for honeypot simulation */
-        .simulation-container { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        .honeypot-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        .honeypot-table th, .honeypot-table td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
-        .honeypot-table th { background: #f8f9fa; font-weight: 600; }
-        .simulate-btn { background: #ff9800; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin: 5px; }
-        .simulate-btn:hover { background: #f57c00; }
-        .config-info { background: #e3f2fd; padding: 10px; border-radius: 4px; margin: 10px 0; font-size: 0.9em; }
-        .data-preview { background: #f5f5f5; padding: 10px; border-radius: 4px; margin: 10px 0; font-family: monospace; font-size: 0.9em; overflow-x: auto; }
-        .warning { background: #fff3cd; color: #856404; padding: 10px; border-radius: 4px; margin: 10px 0; }
-        .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
-        .tab { padding: 10px 20px; background: #e0e0e0; border-radius: 4px 4px 0 0; cursor: pointer; }
-        .tab.active { background: #fff; font-weight: bold; }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Rajdhani', monospace;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+        
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 50%, rgba(0, 245, 255, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(255, 107, 107, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 40% 80%, rgba(78, 205, 196, 0.1) 0%, transparent 50%);
+            animation: backgroundShift 20s ease-in-out infinite;
+            z-index: -2;
+        }
+        
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(rgba(0, 245, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 245, 255, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            z-index: -1;
+            animation: gridMove 30s linear infinite;
+        }
+        
+        @keyframes backgroundShift {
+            0%, 100% { transform: scale(1) rotate(0deg); }
+            50% { transform: scale(1.1) rotate(1deg); }
+        }
+        
+        @keyframes gridMove {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(50px, 50px); }
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            padding: 30px;
+            border-radius: 20px;
+            margin-bottom: 30px;
+            border: 1px solid var(--border-glow);
+            box-shadow: 
+                0 0 50px rgba(0, 245, 255, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(0, 245, 255, 0.05), transparent);
+            animation: sweep 8s ease-in-out infinite;
+        }
+        
+        @keyframes sweep {
+            0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+            50% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+            100% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+        }
+        
+        .header h1 {
+            font-family: 'Orbitron', monospace;
+            font-size: 2.5em;
+            font-weight: 900;
+            background: linear-gradient(45deg, var(--primary-glow), var(--accent-glow));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: 0 0 30px rgba(0, 245, 255, 0.5);
+            margin-bottom: 15px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .status-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .status-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            position: relative;
+        }
+        
+        .status-online {
+            background: var(--accent-glow);
+            box-shadow: 
+                0 0 20px var(--accent-glow),
+                inset 0 0 5px rgba(255, 255, 255, 0.3);
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        .status-offline {
+            background: var(--secondary-glow);
+            box-shadow: 0 0 20px var(--secondary-glow);
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.2); }
+        }
+        
+        .refresh-btn {
+            background: linear-gradient(45deg, var(--primary-glow), var(--accent-glow));
+            color: var(--bg-dark);
+            border: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-family: 'Orbitron', monospace;
+            font-weight: 700;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 25px rgba(0, 245, 255, 0.3);
+        }
+        
+        .refresh-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 35px rgba(0, 245, 255, 0.5);
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+            border: 1px solid var(--border-glow);
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 40px rgba(0, 245, 255, 0.2);
+        }
+        
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--primary-glow), transparent);
+            animation: scanLine 3s ease-in-out infinite;
+        }
+        
+        @keyframes scanLine {
+            0% { left: -100%; }
+            50% { left: 100%; }
+            100% { left: -100%; }
+        }
+        
+        .stat-number {
+            font-family: 'Orbitron', monospace;
+            font-size: 3em;
+            font-weight: 900;
+            background: linear-gradient(45deg, var(--secondary-glow), var(--warning-glow));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+        
+        @keyframes glow {
+            from { text-shadow: 0 0 20px rgba(255, 107, 107, 0.5); }
+            to { text-shadow: 0 0 30px rgba(255, 215, 0, 0.8); }
+        }
+        
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 1.1em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 25px;
+            border-radius: 15px;
+            overflow: hidden;
+            background: var(--bg-darker);
+            padding: 5px;
+        }
+        
+        .tab {
+            flex: 1;
+            padding: 15px 25px;
+            background: transparent;
+            color: var(--text-secondary);
+            border: none;
+            cursor: pointer;
+            font-family: 'Orbitron', monospace;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+            border-radius: 10px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .tab.active {
+            background: linear-gradient(45deg, var(--primary-glow), var(--accent-glow));
+            color: var(--bg-dark);
+            box-shadow: 0 0 25px rgba(0, 245, 255, 0.3);
+        }
+        
+        .tab:not(.active):hover {
+            background: rgba(0, 245, 255, 0.1);
+            color: var(--primary-glow);
+        }
+        
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .alerts-container, .simulation-container {
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            padding: 30px;
+            border-radius: 20px;
+            border: 1px solid var(--border-glow);
+            margin-bottom: 25px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .alerts-container h2, .simulation-container h2 {
+            font-family: 'Orbitron', monospace;
+            font-size: 1.8em;
+            margin-bottom: 20px;
+            color: var(--primary-glow);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        
+        .alert {
+            background: linear-gradient(135deg, rgba(255, 107, 107, 0.1), rgba(255, 107, 107, 0.05));
+            border: 1px solid rgba(255, 107, 107, 0.3);
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            position: relative;
+            overflow: hidden;
+            animation: alertSlideIn 0.5s ease-out;
+        }
+        
+        @keyframes alertSlideIn {
+            from { transform: translateX(-100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        .alert::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 4px;
+            height: 100%;
+            background: linear-gradient(to bottom, var(--secondary-glow), var(--warning-glow));
+            animation: alertPulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes alertPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .timestamp {
+            color: var(--text-secondary);
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+        
+        .no-alerts {
+            text-align: center;
+            color: var(--text-secondary);
+            padding: 60px 40px;
+            font-size: 1.2em;
+        }
+        
+        .honeypot-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        
+        .honeypot-table th {
+            background: linear-gradient(135deg, var(--primary-glow), var(--accent-glow));
+            color: var(--bg-dark);
+            padding: 15px;
+            font-family: 'Orbitron', monospace;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .honeypot-table td {
+            padding: 15px;
+            border-bottom: 1px solid rgba(0, 245, 255, 0.1);
+            transition: background 0.3s ease;
+        }
+        
+        .honeypot-table tr:hover td {
+            background: rgba(0, 245, 255, 0.05);
+        }
+        
+        .simulate-btn {
+            background: linear-gradient(45deg, var(--warning-glow), #ff8c00);
+            color: var(--bg-dark);
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-family: 'Rajdhani', monospace;
+            font-weight: 600;
+            margin: 3px;
+            transition: all 0.3s ease;
+            font-size: 0.9em;
+        }
+        
+        .simulate-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.4);
+        }
+        
+        .config-info, .warning {
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            backdrop-filter: blur(10px);
+        }
+        
+        .config-info {
+            background: rgba(78, 205, 196, 0.1);
+            border: 1px solid rgba(78, 205, 196, 0.3);
+            color: var(--accent-glow);
+        }
+        
+        .warning {
+            background: rgba(255, 215, 0, 0.1);
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            color: var(--warning-glow);
+        }
+        
+        .data-preview {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            overflow-x: auto;
+            border: 1px solid rgba(0, 245, 255, 0.2);
+        }
+        
+        .data-preview table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .data-preview th, .data-preview td {
+            padding: 8px;
+            border: 1px solid rgba(0, 245, 255, 0.2);
+            text-align: left;
+        }
+        
+        .data-preview th {
+            background: rgba(0, 245, 255, 0.1);
+            color: var(--primary-glow);
+        }
+        
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: var(--bg-darker);
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(45deg, var(--primary-glow), var(--accent-glow));
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-glow);
+        }
+        
+        @media (max-width: 768px) {
+            .container { padding: 10px; }
+            .header h1 { font-size: 1.8em; }
+            .stats { grid-template-columns: 1fr; }
+            .tabs { flex-direction: column; }
+            .status-container { flex-direction: column; gap: 15px; }
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🍯 PostgreSQL Honeypot Monitor</h1>
-            <div style="margin-bottom: 10px;">
-                <span class="status-indicator status-online"></span>
-                <span>Monitor Service Online</span>
-                <button class="refresh-btn" onclick="loadAlerts()" style="float: right;">Refresh</button>
+            <h1>🍯 HONEYPOT COMMAND CENTER</h1>
+            <div class="status-container">
+                <div class="status-info">
+                    <span class="status-indicator status-online"></span>
+                    <span>NEURAL LINK ACTIVE</span>
+                </div>
+                <button class="refresh-btn" onclick="loadAlerts()">REFRESH DATA</button>
             </div>
-            <div style="font-size: 0.9em; color: #666;">
-                Real-time monitoring for PostgreSQL honeypot tables
+            <div style="font-size: 1.1em; color: var(--text-secondary); margin-top: 15px; position: relative; z-index: 1;">
+                REAL-TIME THREAT DETECTION & ANALYSIS SYSTEM
             </div>
         </div>
         
@@ -170,36 +622,36 @@ class HoneypotMonitorHandler(BaseHTTPRequestHandler):
         </div>
         
         <div class="tabs">
-            <div class="tab active" onclick="switchTab('alerts')">🚨 Alerts</div>
-            <div class="tab" onclick="switchTab('simulation')">🎮 Simulation</div>
+            <div class="tab active" onclick="switchTab('alerts')">🚨 THREAT ALERTS</div>
+            <div class="tab" onclick="switchTab('simulation')">🎮 COMBAT SIMULATION</div>
         </div>
         
         <div id="alerts-tab" class="tab-content active">
             <div class="alerts-container">
-                <h2>Recent Alerts</h2>
-                <div id="alerts">Loading alerts...</div>
+                <h2>⚡ THREAT MATRIX</h2>
+                <div id="alerts">SCANNING FOR INTRUSIONS...</div>
             </div>
         </div>
         
         <div id="simulation-tab" class="tab-content">
             <div class="simulation-container">
-                <h2>🎮 Honeypot Access Simulation</h2>
-                <p>Simulate accessing honeypot tables to test the alert system and see infinite data generation.</p>
+                <h2>🎮 TACTICAL SIMULATION</h2>
+                <p>Execute controlled infiltration scenarios to test defensive systems and infinite data generation protocols.</p>
                 
                 <div class="warning">
-                    ⚠️ <strong>Note:</strong> Simulated access will trigger real alerts. Tables with infinite data are limited to 100 rows for safety.
+                    ⚠️ <strong>CAUTION:</strong> Simulation protocols will trigger real defense systems. Infinite data streams limited to 100 rows for system stability.
                 </div>
                 
                 <div class="config-info" id="config-info">
-                    Loading configuration...
+                    LOADING SYSTEM CONFIGURATION...
                 </div>
                 
-                <h3>Available Honeypot Tables</h3>
-                <div id="honeypot-tables">Loading tables...</div>
+                <h3 style="color: var(--primary-glow); font-family: 'Orbitron', monospace; text-transform: uppercase; letter-spacing: 2px; margin: 25px 0 15px 0;">TARGET SYSTEMS</h3>
+                <div id="honeypot-tables">SCANNING NETWORK...</div>
                 
-                <h3>Query Results</h3>
+                <h3 style="color: var(--accent-glow); font-family: 'Orbitron', monospace; text-transform: uppercase; letter-spacing: 2px; margin: 25px 0 15px 0;">INFILTRATION RESULTS</h3>
                 <div id="query-results">
-                    <p style="color: #666;">Select a table above to simulate access</p>
+                    <p style="color: var(--text-secondary); text-align: center; padding: 40px;">SELECT TARGET TO INITIATE SIMULATION</p>
                 </div>
             </div>
         </div>
@@ -216,7 +668,7 @@ class HoneypotMonitorHandler(BaseHTTPRequestHandler):
                     const uniqueTables = document.getElementById('unique-tables');
                     
                     if (data.length === 0) {
-                        alertsContainer.innerHTML = '<div class="no-alerts">No alerts yet. When honeypot tables are accessed, alerts will appear here.</div>';
+                        alertsContainer.innerHTML = '<div class="no-alerts">⭕ NO ACTIVE THREATS DETECTED<br><span style="font-size: 0.9em; opacity: 0.7;">DEFENSIVE PERIMETER IS SECURE</span></div>';
                         totalAlerts.textContent = '0';
                         uniqueUsers.textContent = '0';
                         uniqueTables.textContent = '0';
@@ -231,19 +683,19 @@ class HoneypotMonitorHandler(BaseHTTPRequestHandler):
                     // Display alerts
                     alertsContainer.innerHTML = data.reverse().map(alert => {
                         return '<div class="alert">' +
-                            '<strong>🚨 Honeypot Access Detected!</strong><br>' +
-                            '<strong>Table:</strong> ' + (alert.table || 'unknown') + '<br>' +
-                            '<strong>User:</strong> ' + (alert.user || 'unknown') + '<br>' +
-                            '<strong>Client IP:</strong> ' + (alert.client_ip || 'unknown') + '<br>' +
-                            '<strong>Message:</strong> ' + (alert.alert || 'Honeypot table accessed') +
-                            (alert.rows_accessed ? '<br><strong>Rows accessed:</strong> ' + alert.rows_accessed : '') +
-                            '<div class="timestamp">⏰ ' + (alert.timestamp || 'unknown time') + '</div>' +
+                            '<strong>🚨 INFILTRATION DETECTED</strong><br>' +
+                            '<strong>TARGET:</strong> ' + (alert.table || 'UNKNOWN_SYSTEM').toUpperCase() + '<br>' +
+                            '<strong>ENTITY:</strong> ' + (alert.user || 'ANONYMOUS') + '<br>' +
+                            '<strong>SOURCE:</strong> ' + (alert.client_ip || 'UNKNOWN_NODE') + '<br>' +
+                            '<strong>BREACH TYPE:</strong> ' + (alert.alert || 'Data access violation').toUpperCase() +
+                            (alert.rows_accessed ? '<br><strong>DATA EXTRACTED:</strong> ' + alert.rows_accessed + ' RECORDS' : '') +
+                            '<div class="timestamp">📡 ' + (alert.timestamp || 'TIMESTAMP_ERROR') + '</div>' +
                         '</div>';
                     }).join('');
                 })
                 .catch(error => {
                     console.error('Error loading alerts:', error);
-                    document.getElementById('alerts').innerHTML = '<div class="no-alerts">Error loading alerts. Check monitor service.</div>';
+                    document.getElementById('alerts').innerHTML = '<div class="no-alerts">⚠️ NEURAL LINK FAILURE<br><span style="font-size: 0.9em; opacity: 0.7;">ATTEMPTING TO RECONNECT...</span></div>';
                 });
         }
         
